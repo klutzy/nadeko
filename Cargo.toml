@@ -1,0 +1,10 @@
+[package]
+
+name = "nadeko"
+version = "0.0.1"
+authors = ["klutzy <klutzytheklutzy@gmail.com>"]
+
+[lib]
+name = "nadeko"
+path = "src/lib.rs"
+plugin = true
