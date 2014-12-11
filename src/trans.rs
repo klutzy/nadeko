@@ -376,7 +376,7 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
 
         let new_node = match expr.node {
             ast::ExprAssign(ref a, ref b) => {
-                if !expr_is_lhs(&**a) {
+                if !expr_is_assignable(&**a) {
                     self.tf.cx.span_err(a.span, "inappropriate lhs");
                 }
 
@@ -410,7 +410,7 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
                 return Some(self.trans_expr(&**e));
             }
             ast::ExprCall(ref path, ref args) => {
-                if !expr_is_lhs(&**path) {
+                if !expr_is_assignable(&**path) {
                     self.tf.cx.span_err(path.span, "found non-trivial path");
                 }
                 let new_path = self.tf.fold_expr(path.clone());
@@ -466,7 +466,7 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
     }
 
     fn trans_assign_expr(&mut self, lhs: &ast::Expr, expr: &ast::Expr) {
-        if !expr_is_lhs(lhs) {
+        if !expr_is_assignable(lhs) {
             self.tf.cx.span_err(lhs.span, "inappropriate lhs");
             return;
         }
@@ -720,17 +720,28 @@ fn ty_from_str(s: &str, span: Span) -> P<ast::Ty> {
     new_ty(ty_, span)
 }
 
-fn expr_is_lhs(e: &ast::Expr) -> bool {
+// return true if `e` is appropriate for `e = ...;`.
+fn expr_is_assignable(e: &ast::Expr) -> bool {
     fn expr_is_clean(e: &ast::Expr, lit_ok: bool) -> bool {
         match e.node {
             ast::ExprLit(..) => lit_ok,
             ast::ExprPath(..) => true,
             ast::ExprIndex(ref a, ref b) => {
-                expr_is_clean(&**a, false) && expr_is_clean(&**b, true)
+                expr_is_clean(&**a, false) && expr_is_lit(&**b)
             }
             // TODO references?
             _ => false,
         }
     }
     expr_is_clean(e, false)
+}
+
+// return true if `e` is constant.
+fn expr_is_lit(e: &ast::Expr) -> bool {
+    match e.node {
+        ast::ExprLit(..) => true,
+        ast::ExprParen(ref expr) => expr_is_lit(&**expr),
+        // TODO: binop, unop
+        _ => false,
+    }
 }
