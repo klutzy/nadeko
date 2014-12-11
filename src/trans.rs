@@ -390,7 +390,7 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
                 let blk = {
                     let mut new_cx = BlkCx::new(self.tf, expr.span);
 
-                    let blk = new_cx.trans_expr_to_assignable("blk", &*expr).1;
+                    let blk = new_cx.trans_expr_to_new_var("blk", &*expr).1;
                     new_cx.final_expr = Some(blk);
 
                     new_cx.into_block()
@@ -417,7 +417,7 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
 
                 let new_args = args.iter().map(|arg| {
                     // evalute args left-to-right.
-                    let new_arg_expr = self.trans_expr_to_assignable("arg", &**arg).1;
+                    let new_arg_expr = self.trans_expr_to_new_var("arg", &**arg).1;
                     new_arg_expr
                 }).collect();
                 ast::ExprCall(new_path, new_args)
@@ -447,8 +447,7 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
     // `new_expr` is `path_expr(new_name)`.
     // if `expr` is ExprPath, it just returns the path without introducing
     // new variable name.
-    // TODO bad name..
-    fn trans_expr_to_assignable(&mut self,
+    fn trans_expr_to_new_var(&mut self,
                                 new_name: &str,
                                 expr: &ast::Expr) -> (ast::Path, P<ast::Expr>) {
         match expr.node {
@@ -488,7 +487,7 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
             }
 
             ast::ExprUnary(uop, ref a) => {
-                let a_name = self.trans_expr_to_assignable("tmp", &**a).0;
+                let a_name = self.trans_expr_to_new_var("tmp", &**a).0;
 
                 match uop {
                     ast::UnNot | ast::UnNeg => {
@@ -530,8 +529,8 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
                 }
             }
             ast::ExprBinary(bop, ref a, ref b) => {
-                let a_name = self.trans_expr_to_assignable("lhs", &**a).0;
-                let b_name = self.trans_expr_to_assignable("rhs", &**b).0;
+                let a_name = self.trans_expr_to_new_var("lhs", &**a).0;
+                let b_name = self.trans_expr_to_new_var("rhs", &**b).0;
 
                 match bop {
                     ast::BiBitXor | ast::BiBitAnd | ast::BiBitOr | ast::BiAdd | ast::BiSub => {
