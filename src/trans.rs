@@ -238,7 +238,7 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
            outputs: &[(&str, P<ast::Expr>)],
            inputs: &[(&str, P<ast::Expr>)],
            clobbers: &[&str],
-           sp: Span) -> P<ast::Expr> {
+           sp: Span) -> P<ast::Stmt> {
         let outputs: Vec<_> = outputs.iter().map(|&(p, ref q)| {
             (InternedString::new(p), q.clone(), /* is_rw: */ false)
         }).collect();
@@ -281,7 +281,9 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
             span: sp,
         };
 
-        new_expr(ast::ExprBlock(P(unsafe_block)), sp)
+        let expr = new_expr(ast::ExprBlock(P(unsafe_block)), sp);
+        let stmt = spanned(ast::StmtExpr(expr, DID), sp);
+        stmt
     }
 }
 
@@ -518,9 +520,8 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
                             ("0", path_expr(a_name.clone(), expr.span)),
                         ];
 
-                        let asm_expr = self.asm(&*asm, &outputs, &inputs, &["cc"], expr.span);
-                        let asm_stmt = spanned(ast::StmtExpr(asm_expr, DID), expr.span);
-                        self.stmts.push(asm_stmt);
+                        let stmt = self.asm(&*asm, &outputs, &inputs, &["cc"], expr.span);
+                        self.stmts.push(stmt);
                     }
                     // UnDeref is done in `trans_simple_expr`
                     _ => {
@@ -558,10 +559,8 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
                             ("0", path_expr(a_name.clone(), expr.span)),
                         ];
 
-                        let asm_expr = self.asm(&*asm, &outputs, &inputs, &["cc"], expr.span);
-                        debug!("asm expr: {}", asm_expr);
-                        let asm_stmt = spanned(ast::StmtExpr(asm_expr, DID), expr.span);
-                        self.stmts.push(asm_stmt);
+                        let stmt = self.asm(&*asm, &outputs, &inputs, &["cc"], expr.span);
+                        self.stmts.push(stmt);
                     }
                     ast::BiShl | ast::BiShr => {
                         match *expr_sty {
@@ -597,9 +596,8 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
                             ("0", path_expr(a_name.clone(), expr.span)),
                         ];
 
-                        let asm_expr = self.asm(&*asm, &outputs, &inputs, &["cc"], expr.span);
-                        let asm_stmt = spanned(ast::StmtExpr(asm_expr, DID), expr.span);
-                        self.stmts.push(asm_stmt);
+                        let stmt = self.asm(&*asm, &outputs, &inputs, &["cc"], expr.span);
+                        self.stmts.push(stmt);
                     }
                     ast::BiMul => {
                         match *expr_sty {
@@ -613,9 +611,8 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
                                 ];
                                 let clobbers = &["cc", "ax"];
 
-                                let asm_expr = self.asm(asm, outputs, inputs, clobbers, expr.span);
-                                let asm_stmt = spanned(ast::StmtExpr(asm_expr, DID), expr.span);
-                                self.stmts.push(asm_stmt);
+                                let stmt = self.asm(asm, outputs, inputs, clobbers, expr.span);
+                                self.stmts.push(stmt);
                             }
                             ty::ty_uint(..) | ty::ty_int(..) => {
                                 let asm = "imul $1, $0";
@@ -625,10 +622,8 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
                                     ("0", path_expr(a_name.clone(), expr.span)),
                                 ];
 
-                                let asm_expr = self.asm(asm, &outputs, &inputs, &["cc"], expr.span);
-                                debug!("asm expr: {}", asm_expr);
-                                let asm_stmt = spanned(ast::StmtExpr(asm_expr, DID), expr.span);
-                                self.stmts.push(asm_stmt);
+                                let stmt = self.asm(asm, &outputs, &inputs, &["cc"], expr.span);
+                                self.stmts.push(stmt);
                             }
                             _ => {
                                 let err = format!("unsupported type: {}", *expr_sty);
@@ -655,9 +650,8 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
                             ("r", path_expr(b_name.clone(), b.span)),
                         ];
 
-                        let asm_expr = self.asm(&*asm, &outputs, &inputs, &["cc"], expr.span);
-                        let asm_stmt = spanned(ast::StmtExpr(asm_expr, DID), expr.span);
-                        self.stmts.push(asm_stmt);
+                        let stmt = self.asm(&*asm, &outputs, &inputs, &["cc"], expr.span);
+                        self.stmts.push(stmt);
 
                     }
                     _ => {

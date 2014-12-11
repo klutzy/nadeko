@@ -174,9 +174,9 @@ fn nadeko<'a>(cx: &mut ExtCtxt<'a>,
 /// Run the resolution, typechecking, region checking and other
 /// miscellaneous analysis passes on the crate. Return various
 /// structures carrying the results of the analysis.
-pub fn phase_3_run_analysis_passes<'tcx>(sess: rustc::session::Session,
-                                         ast_map: ast_map::Map<'tcx>,
-                                         type_arena: &'tcx TypedArena<ty::TyS<'tcx>>) -> ty::ctxt<'tcx> {
+pub fn phase_3_run_analysis_passes<'t>(sess: rustc::session::Session,
+                                       ast_map: ast_map::Map<'t>,
+                                       type_arena: &'t TypedArena<ty::TyS<'t>>) -> ty::ctxt<'t> {
 
     let krate = ast_map.krate();
 
@@ -191,9 +191,7 @@ pub fn phase_3_run_analysis_passes<'tcx>(sess: rustc::session::Session,
         ..
     } = middle::resolve::resolve_crate(&sess, &lang_items, krate);
 
-    // `rustc_driver::driver::phase_3_run_analysis_passes` *removes* tables
-    // which are importantly used after this syntax extension finishes.
-    // syntax::ext::mtwt::clear_tables();
+    // do not call `syntax::ext::mtwt::clear_tables()`!
 
     // TODO: we are skipping some non-essential passes, but not sure if it affects typeck..
 
