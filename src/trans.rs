@@ -88,7 +88,6 @@ impl<'a, 'b, 'c> TransFolder<'a, 'b, 'c> {
             }
         };
 
-        // let new_attrs = (*item).attrs.into_iter().map(|s| self.fold_attribute(s)).collect();
         let new_item = ast::Item {
             ident: item.ident,
             attrs: item.attrs.iter().map(|s| self.fold_attribute(s.clone())).collect(),
@@ -120,8 +119,6 @@ impl<'a, 'b, 'c> TransFolder<'a, 'b, 'c> {
     }
 }
 
-// block context
-// see TransFolder.trans_block()
 struct BlkCx<'t, 'a: 't, 'b: 'a, 'c: 'a> {
     tf: &'t mut TransFolder<'a, 'b, 'c>,
     // counter for indeterminate variable; just for easier debugging
@@ -130,23 +127,6 @@ struct BlkCx<'t, 'a: 't, 'b: 'a, 'c: 'a> {
     final_expr: Option<P<ast::Expr>>,
     span: Span,
 }
-
-// before my head explodes, this is overall strategy in my head:
-//
-// For general `expr`, use trans_expr.
-//
-// For `lhs = expr`, use trans_assign_expr.
-// this currently exists purely for cosmetic issues.
-// trans_expr should work for assign expr anyway,
-// `a = expr` would be
-// `a = {let mut tmp; trans_assign_expr(tmp <- expr); tmp};`.
-//
-// For `let a = expr;` use trans_expr.
-// trans_assign_expr is not appropriate because
-// `let mut a; a = expr;` pattern does not work:
-// `let a = a + 1;` becomes `let mut a; asm!(a <- a + 1);`
-//
-// then we ca *something explodes*
 
 impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
     fn new(tf: &'t mut TransFolder<'a, 'b, 'c>, span: Span) -> BlkCx<'t, 'a, 'b, 'c> {
@@ -320,21 +300,17 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
                     }
                 }
             }
-            ast::StmtSemi(ref expr, _) => {
+            ast::StmtSemi(ref expr, _) | ast::StmtExpr(ref expr, _) => {
                 if let ast::ExprAssign(ref a, ref b) = expr.node {
                     self.trans_assign_expr(&**a, &**b);
                 } else {
                     let new_expr = self.trans_expr(&**expr);
-                    let stmt = spanned(ast::StmtSemi(new_expr, DID), stmt.span);
-                    self.stmts.push(stmt);
-                }
-            }
-            ast::StmtExpr(ref expr, _) => {
-                if let ast::ExprAssign(ref a, ref b) = expr.node {
-                    self.trans_assign_expr(&**a, &**b);
-                } else {
-                    let new_expr = self.trans_expr(&**expr);
-                    let stmt = spanned(ast::StmtExpr(new_expr, DID), stmt.span);
+                    let new_node = match stmt.node {
+                        ast::StmtSemi(..) => ast::StmtSemi(new_expr, DID),
+                        ast::StmtExpr(..) => ast::StmtExpr(new_expr, DID),
+                        _ => unreachable!(),
+                    };
+                    let stmt = spanned(new_node, stmt.span);
                     self.stmts.push(stmt);
                 }
             }
@@ -345,8 +321,6 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
         }
     }
 
-    // given `let pat;`, generate `let pat: ty;`
-    // given `let pat = expr;`, generate `let pat: ty = { expr block };`
     pub fn trans_decl_local(&mut self, local: &ast::Local, decl_sp: Span) {
         let (pat_sp, new_pat) = match local.pat.node {
             ast::PatIdent(bmode, sid, ref p) => {
@@ -395,6 +369,41 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
         self.stmts.push(let_stmt);
     }
 
+    // this uses `trans_assign_expr` as default fallback
+    fn trans_expr(&mut self, expr: &ast::Expr) -> P<ast::Expr> {
+        if let Some(e) = self.trans_simple_expr(expr) {
+            return e;
+        }
+
+        let new_node = match expr.node {
+            ast::ExprAssign(ref a, ref b) => {
+                if !expr_is_lhs(&**a) {
+                    self.tf.cx.span_err(a.span, "inappropriate lhs");
+                }
+
+                let new_a = self.tf.fold_expr(a.clone());
+                let new_b = self.trans_expr(&**b);
+
+                ast::ExprAssign(new_a, new_b)
+            }
+            _ => {
+                // `{ let mut blk; trans_assign_expr(blk <- b); blk }`
+                let blk = {
+                    let mut new_cx = BlkCx::new(self.tf, expr.span);
+
+                    let name = new_cx.decl_new_name("blk", &*expr);
+                    let blk = path_expr(name.clone(), expr.span);
+                    new_cx.trans_assign_expr(&*blk, &*expr);
+                    new_cx.final_expr = Some(blk);
+
+                    new_cx.into_block()
+                };
+                ast::ExprBlock(P(blk))
+            }
+        };
+        new_expr(new_node, expr.span)
+    }
+
     fn trans_simple_expr(&mut self, expr: &ast::Expr) -> Option<P<ast::Expr>> {
         let new_node = match expr.node {
             ast::ExprPath(..) | ast::ExprLit(..) => {
@@ -439,75 +448,6 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
         Some(new_expr(new_node, expr.span))
     }
 
-    // for ExprAssign, `trans_assign_expr` would be better.
-    fn trans_expr(&mut self, expr: &ast::Expr) -> P<ast::Expr> {
-        if let Some(e) = self.trans_simple_expr(expr) {
-            return e;
-        }
-
-        let new_node = match expr.node {
-            // handle simple patterns here.
-            // for complex ones, we will just use `trans_assign_expr` with
-            // new temporary variable.
-            ast::ExprCall(ref path, ref args) => {
-                if !expr_is_lhs(&**path) {
-                    self.tf.cx.span_err(path.span, "found non-trivial path");
-                }
-                let new_path = self.tf.fold_expr(path.clone());
-
-                let new_args = args.iter().map(|arg| {
-                    // evalute args left-to-right.
-                    let new_arg = self.decl_new_name("arg", &**arg);
-                    let new_arg_expr = path_expr(new_arg.clone(), arg.span);
-                    self.trans_assign_expr(&*new_arg_expr, &**arg);
-                    new_arg_expr
-                }).collect();
-                let rhs = new_expr(ast::ExprCall(new_path, new_args), expr.span);
-                return rhs;
-            }
-            ast::ExprPath(..) | ast::ExprLit(..) => {
-                return self.tf.fold_expr(P(expr.clone()));
-            }
-            ast::ExprBlock(ref blk) => {
-                let new_blk = self.tf.trans_block(&**blk, expr.span);
-                return new_expr(ast::ExprBlock(P(new_blk)), expr.span)
-            }
-            ast::ExprParen(ref e) => {
-                return self.trans_expr(&**e);
-            }
-            ast::ExprRet(ref e) => {
-                let new_ret_expr = match *e {
-                    Some(ref e) => Some(self.trans_expr(&**e)),
-                    None => None,
-                };
-                ast::ExprRet(new_ret_expr)
-            }
-            ast::ExprAssign(ref a, ref b) => {
-                if !expr_is_lhs(&**a) {
-                    self.tf.cx.span_err(a.span, "inappropriate lhs");
-                }
-                let new_a = self.tf.fold_expr(a.clone());
-                let new_b = self.trans_expr(&**b);
-
-                ast::ExprAssign(new_a, new_b)
-            }
-            _ => {
-                // `{ let mut blk; trans_assign_expr(blk <- b); blk }`
-                let blk = {
-                    let mut new_cx = BlkCx::new(self.tf, expr.span);
-
-                    let name = new_cx.decl_new_name("blk", &*expr);
-                    let blk = path_expr(name.clone(), expr.span);
-                    new_cx.trans_assign_expr(&*blk, &*expr);
-                    new_cx.final_expr = Some(blk);
-
-                    new_cx.into_block()
-                };
-                ast::ExprBlock(P(blk))
-            }
-        };
-        new_expr(new_node, expr.span)
-    }
 
     fn trans_assign_expr(&mut self, lhs: &ast::Expr, expr: &ast::Expr) {
         if !expr_is_lhs(lhs) {
