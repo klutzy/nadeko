@@ -21,18 +21,11 @@ mod example {
         return {
                    let mut blk0: u8;
                    let mut lhs1: u8;
-                   let mut lhs2: u8;
-                   lhs2 = a;
-                   let mut rhs3: u8;
-                   rhs3 = b;
                    unsafe {
-                       asm!("add $1, $0": "=r"(lhs1) : "r"(rhs3), "0"(lhs2) :
-                           "cc")
+                       asm!("add $1, $0": "=r"(lhs1) : "r"(b), "0"(a) : "cc")
                    }
-                   let mut rhs4: u8;
-                   rhs4 = c;
                    unsafe {
-                       asm!("add $1, $0": "=r"(blk0) : "r"(rhs4), "0"(lhs1) :
+                       asm!("add $1, $0": "=r"(blk0) : "r"(c), "0"(lhs1) :
                            "cc")
                    }
                    blk0
