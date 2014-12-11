@@ -22,6 +22,7 @@ use syntax::codemap::{Span, DUMMY_SP};
 use syntax::ptr::P;
 use syntax::parse::token;
 use syntax::parse::token::InternedString;
+use syntax::ext::expand;
 use syntax::ext::base::ExtCtxt;
 use syntax::ext::base::{SyntaxExtension};
 use syntax::owned_slice::OwnedSlice;
@@ -52,14 +53,6 @@ fn nadeko<'a>(cx: &mut ExtCtxt<'a>,
         }
     }
 
-    let mod_ = match (*orig_item).node {
-        ast::ItemMod(ref mod_) => mod_.clone(),
-        _ => {
-            cx.span_err(sp, "`#[const_time]` on non-mod item");
-            return orig_item.clone();
-        }
-    };
-
     // to convert functions into assembly code, we have to run *typechecker*
     // because we need to know the type of `(a as u32) * (b as u32)`.
     // but we are in phase 2 and typeck will be run at phase 3.
@@ -80,14 +73,22 @@ fn nadeko<'a>(cx: &mut ExtCtxt<'a>,
     // the more stable solution would be invoking rustc in a separate thread.
     // this is basically TODO FIXME issue right now.
 
+    // phase 1: parse and get crate
+
+    let mod_ = match (*orig_item).node {
+        ast::ItemMod(ref mod_) => mod_.clone(),
+        _ => {
+            cx.span_err(sp, "`#[const_time]` on non-mod item");
+            return orig_item.clone();
+        }
+    };
+
     let sopts = rustc::session::config::basic_options();
     let descriptions = syntax::diagnostics::registry::Registry::new(&[]);
     let mut sess = rustc::session::build_session(sopts, None, descriptions);
     sess.parse_sess.span_diagnostic.cm.files = cx.parse_sess.span_diagnostic.cm.files.clone();
 
-    // this crate does not use core/std.
-
-    let mut new_krate = ast::Crate {
+    let new_krate = ast::Crate {
         attrs: Vec::new(),
         config: Vec::new(),
         span: mod_.inner,
@@ -95,12 +96,12 @@ fn nadeko<'a>(cx: &mut ExtCtxt<'a>,
         module: mod_,
     };
 
-    // now phase 1: parsing is done. woohoo!
-    // phase 2: configure/expand
+    // phase 2: expand macros and inject lang items
 
-    // TODO: expand macros!
-
-    // inject lang items
+    let cfg = expand::ExpansionConfig::default("wat".to_string());
+    let macros = Vec::new();
+    let synexts = Vec::new();
+    let mut new_krate = expand::expand_crate(&sess.parse_sess, cfg, macros, synexts, new_krate);
 
     fn lang_attr(name: &'static str) -> ast::Attribute {
         let lit = ast::Lit {
@@ -156,7 +157,7 @@ fn nadeko<'a>(cx: &mut ExtCtxt<'a>,
     let sync_item = lang_item("sync", "Sync", Vec::new());
     new_krate.module.items.push(P(sync_item));
 
-    // now the crate is ready to build. run rustc type checker.
+    // phase 3: type check
 
     let mut forest = ast_map::Forest::new(new_krate);
     let ast_map = driver::assign_node_ids_and_map(&sess, &mut forest);
@@ -164,7 +165,8 @@ fn nadeko<'a>(cx: &mut ExtCtxt<'a>,
     let type_arena = arena::TypedArena::new();
     let analysis = phase_3_run_analysis_passes(sess, ast_map, &type_arena);
 
-    // instead of usual trans, we translate ast into new ast!
+    // phase 4: translate ast into new ast!
+
     let new_mod = phase_4_trans(cx, &analysis, &*orig_item);
     new_mod
 }
