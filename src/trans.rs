@@ -369,7 +369,6 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
         self.stmts.push(let_stmt);
     }
 
-    // this uses `trans_assign_expr` as default fallback
     fn trans_expr(&mut self, expr: &ast::Expr) -> P<ast::Expr> {
         if let Some(e) = self.trans_simple_expr(expr) {
             return e;
@@ -448,7 +447,6 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
         Some(new_expr(new_node, expr.span))
     }
 
-
     fn trans_assign_expr(&mut self, lhs: &ast::Expr, expr: &ast::Expr) {
         if !expr_is_lhs(lhs) {
             self.tf.cx.span_err(lhs.span, "inappropriate lhs");
@@ -526,8 +524,7 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
                 self.trans_assign_expr(&*b_expr, &**b);
 
                 match bop {
-                    ast::BiBitXor | ast::BiBitAnd | ast::BiBitOr | ast::BiAdd | ast::BiSub |
-                    ast::BiAnd => {
+                    ast::BiBitXor | ast::BiBitAnd | ast::BiBitOr | ast::BiAdd | ast::BiSub => {
                         match *expr_sty {
                             ty::ty_uint(..) | ty::ty_int(..) => {}
                             _ => {
@@ -542,7 +539,6 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
                             ast::BiBitOr => "or",
                             ast::BiAdd => "add",
                             ast::BiSub => "sub",
-                            ast::BiAnd => "and",
                             _ => unreachable!(),
                         };
 
