@@ -1,4 +1,4 @@
-(crazy idea. experimental status. do not use this.)
+(crazy idea. wip. experimental status. do not use this.)
 
 nadeko is a syntax extension which converts functions into amd64 assembly code.
 For example,
