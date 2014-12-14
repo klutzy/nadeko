@@ -666,7 +666,8 @@ impl<'t, 'a: 't, 'b: 'a, 'c: 'a> BlkCx<'t, 'a, 'b, 'c> {
                 // NOTE for future work:
                 // - ExprIndex or ExprSlice should be prohibited if [expr] contains
                 // non-constant expression
-                self.tf.cx.span_err(expr.span, "unimplemented Expr");
+                let err = format!("unimplemented Expr: {}", expr.node);
+                self.tf.cx.span_err(expr.span, &*err);
             }
         }
     }
