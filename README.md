@@ -101,6 +101,4 @@ Currently basic primitive arithmetic and restricted form of
 `a + b` becomes `a.const_add(b)`, and `if cond { a } else { b }` becomes
 `cond.const_if(a, b)`.
 
-Also, `slice[expr]` does not compile if `expr` is not a constant literal.
-
-`for` is not implemented yet.
+Also, `slice[expr]` is not allowed if `expr` is not a constant literal.

@@ -336,6 +336,26 @@ impl<'a, 'b: 'a> TransFolder<'a, 'b> {
                     ast::ExprMethodCall(ident, Vec::new(), args)
                 }
 
+                // allow `for i in const..const` only.
+                ast::ExprForLoop(for_pat, for_expr, for_blk, id) => {
+                    if let ast::ExprRange(ref start, ref end) = for_expr.node {
+                        if !expr_is_lit(&**start) {
+                            self.cx.span_err(start.span, "non-constant range");
+                        }
+                        if let Some(ref end) = *end {
+                            if !expr_is_lit(&**end) {
+                                self.cx.span_err(end.span, "non-constant range");
+                            }
+                        }
+                    } else {
+                        self.cx.span_err(for_expr.span, "expected `start..end` range");
+                    };
+
+                    let new_blk = self.trans_block(for_blk);
+
+                    ast::ExprForLoop(for_pat, for_expr, new_blk, id)
+                }
+
                 ast::ExprMac(..) => {
                     self.cx.span_err(expr.span, "macros cannot not be here");
                     ast::ExprTup(Vec::new())

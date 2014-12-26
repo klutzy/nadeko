@@ -55,59 +55,59 @@ impl ChaCha20 {
 
     fn round20(&self) -> [u32, ..16] {
         #[const_time]
-        fn round2(vals: &mut [u32, ..16]) {
-            // $e must be > 0 and < 32
-            macro_rules! rot(
-                ($a:expr, $e:expr) => ({
-                    let a: u32 = $a;
-                    let e: uint = $e;
-                    (a << e) | (a >> (32 - e))
-                })
-            );
+        fn round20_inner(vals: &mut [u32, ..16]) {
+            for _ in 0u..10 {
+                // $e must be > 0 and < 32
+                macro_rules! rot(
+                    ($a:expr, $e:expr) => ({
+                        let a: u32 = $a;
+                        let e: uint = $e;
+                        (a << e) | (a >> (32 - e))
+                    })
+                );
 
-            macro_rules! quarter_round(
-                ($a:expr, $b:expr, $c:expr, $d:expr) => ({
-                    $a += $b;
-                    $d ^= $a;
-                    $d = rot!($d, 16);
+                macro_rules! quarter_round(
+                    ($a:expr, $b:expr, $c:expr, $d:expr) => ({
+                        $a += $b;
+                        $d ^= $a;
+                        $d = rot!($d, 16);
 
-                    $c += $d;
-                    $b ^= $c;
-                    $b = rot!($b, 12);
+                        $c += $d;
+                        $b ^= $c;
+                        $b = rot!($b, 12);
 
-                    $a += $b;
-                    $d ^= $a;
-                    $d = rot!($d, 8);
+                        $a += $b;
+                        $d ^= $a;
+                        $d = rot!($d, 8);
 
-                    $c += $d;
-                    $b ^= $c;
-                    $b = rot!($b, 7);
-                })
-            );
+                        $c += $d;
+                        $b ^= $c;
+                        $b = rot!($b, 7);
+                    })
+                );
 
-            macro_rules! quarter_round_idx(
-                ($e:expr, $a:expr, $b:expr, $c:expr, $d:expr) => (
-                    quarter_round!($e[$a], $e[$b], $e[$c], $e[$d])
-                )
-            );
+                macro_rules! quarter_round_idx(
+                    ($e:expr, $a:expr, $b:expr, $c:expr, $d:expr) => (
+                        quarter_round!($e[$a], $e[$b], $e[$c], $e[$d])
+                    )
+                );
 
-            // column round
-            quarter_round_idx!(vals, 0, 4, 8, 12);
-            quarter_round_idx!(vals, 1, 5, 9, 13);
-            quarter_round_idx!(vals, 2, 6, 10, 14);
-            quarter_round_idx!(vals, 3, 7, 11, 15);
+                // column round
+                quarter_round_idx!(vals, 0, 4, 8, 12);
+                quarter_round_idx!(vals, 1, 5, 9, 13);
+                quarter_round_idx!(vals, 2, 6, 10, 14);
+                quarter_round_idx!(vals, 3, 7, 11, 15);
 
-            // diagonal round
-            quarter_round_idx!(vals, 0, 5, 10, 15);
-            quarter_round_idx!(vals, 1, 6, 11, 12);
-            quarter_round_idx!(vals, 2, 7, 8, 13);
-            quarter_round_idx!(vals, 3, 4, 9, 14);
+                // diagonal round
+                quarter_round_idx!(vals, 0, 5, 10, 15);
+                quarter_round_idx!(vals, 1, 6, 11, 12);
+                quarter_round_idx!(vals, 2, 7, 8, 13);
+                quarter_round_idx!(vals, 3, 4, 9, 14);
+            }
         }
 
         let mut vals = self.vals;
-        for _ in range(0u, 10) {
-            round2(&mut vals);
-        }
+        round20_inner(&mut vals);
 
         for i in range(0u, 16) {
             vals[i] += self.vals[i];
