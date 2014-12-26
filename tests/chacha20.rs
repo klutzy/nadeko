@@ -15,7 +15,7 @@ macro_rules! to_le_u32(
         let v4 = $e[i + 3] as u32;
         v1 | (v2 << 8) | (v3 << 16) | (v4 << 24)
     })
-)
+);
 
 #[allow(missing_copy_implementations)]
 pub struct ChaCha20 {
@@ -63,7 +63,7 @@ impl ChaCha20 {
                     let e: uint = $e;
                     (a << e) | (a >> (32 - e))
                 })
-            )
+            );
 
             macro_rules! quarter_round(
                 ($a:expr, $b:expr, $c:expr, $d:expr) => ({
@@ -83,25 +83,25 @@ impl ChaCha20 {
                     $b ^= $c;
                     $b = rot!($b, 7);
                 })
-            )
+            );
 
             macro_rules! quarter_round_idx(
                 ($e:expr, $a:expr, $b:expr, $c:expr, $d:expr) => (
                     quarter_round!($e[$a], $e[$b], $e[$c], $e[$d])
                 )
-            )
+            );
 
             // column round
-            quarter_round_idx!(vals, 0, 4, 8, 12)
-            quarter_round_idx!(vals, 1, 5, 9, 13)
-            quarter_round_idx!(vals, 2, 6, 10, 14)
-            quarter_round_idx!(vals, 3, 7, 11, 15)
+            quarter_round_idx!(vals, 0, 4, 8, 12);
+            quarter_round_idx!(vals, 1, 5, 9, 13);
+            quarter_round_idx!(vals, 2, 6, 10, 14);
+            quarter_round_idx!(vals, 3, 7, 11, 15);
 
             // diagonal round
-            quarter_round_idx!(vals, 0, 5, 10, 15)
-            quarter_round_idx!(vals, 1, 6, 11, 12)
-            quarter_round_idx!(vals, 2, 7, 8, 13)
-            quarter_round_idx!(vals, 3, 4, 9, 14)
+            quarter_round_idx!(vals, 0, 5, 10, 15);
+            quarter_round_idx!(vals, 1, 6, 11, 12);
+            quarter_round_idx!(vals, 2, 7, 8, 13);
+            quarter_round_idx!(vals, 3, 4, 9, 14);
         }
 
         let mut vals = self.vals;

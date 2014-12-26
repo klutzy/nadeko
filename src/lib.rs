@@ -44,10 +44,7 @@ fn nadeko<'a>(cx: &mut ExtCtxt<'a>,
     // we have to expand macros before trans.
 
     let expanded_item = {
-        let mut expander = expand::MacroExpander {
-            cx: cx,
-        };
-
+        let mut expander = expand::MacroExpander::new(cx);
         expander.fold_item(orig_item).expect_one("macro expanded into multiple items")
     };
 

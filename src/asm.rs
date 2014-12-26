@@ -1,4 +1,4 @@
-macro_rules! const_bop_def(
+macro_rules! const_bop_def {
     ($($tr:ident $m:ident),*) => (
         $(
             pub trait $tr {
@@ -6,8 +6,8 @@ macro_rules! const_bop_def(
             }
         )*
     )
-)
-const_bop_def!(
+}
+const_bop_def! {
     ConstAdd const_add,
     ConstSub const_sub,
     ConstMul const_mul,
@@ -18,9 +18,9 @@ const_bop_def!(
     ConstBitXor const_bit_xor,
     ConstBitAnd const_bit_and,
     ConstBitOr const_bit_or
-)
+}
 
-macro_rules! const_bop_cmp_def(
+macro_rules! const_bop_cmp_def {
     ($($tr:ident $m:ident),*) => (
         $(
             pub trait $tr {
@@ -28,15 +28,15 @@ macro_rules! const_bop_cmp_def(
             }
         )*
     )
-)
-const_bop_cmp_def!(
+}
+const_bop_cmp_def! {
     ConstEq const_eq,
     ConstLt const_lt,
     ConstLe const_le,
     ConstNe const_ne,
     ConstGe const_ge,
     ConstGt const_gt
-)
+}
 
 pub trait ConstShl {
     fn const_shl(self, b: uint) -> Self;
@@ -45,7 +45,7 @@ pub trait ConstShr {
     fn const_shr(self, b: uint) -> Self;
 }
 
-macro_rules! const_uop_def(
+macro_rules! const_uop_def {
     ($($tr:ident $m:ident),*) => (
         $(
             pub trait $tr {
@@ -53,11 +53,11 @@ macro_rules! const_uop_def(
             }
         )*
     )
-)
-const_uop_def!(
+}
+const_uop_def! {
     ConstNeg const_neg,
     ConstNot const_not
-)
+}
 
 pub trait ConstIf<T> {
     fn const_if(self, if_expr: T, else_expr: T) -> T;
@@ -65,7 +65,7 @@ pub trait ConstIf<T> {
 
 // amd64 implementation
 
-macro_rules! const_bop(
+macro_rules! const_bop {
     (
         $tr:ident,
         $m:ident,
@@ -85,46 +85,46 @@ macro_rules! const_bop(
             }
         )*
     )
-)
+}
 
-const_bop!(
+const_bop! {
     ConstAdd, const_add,
     "add $1, $0",
     u8, u16, u32, u64, uint, i8, i16, i32, i64, int
-)
+}
 
-const_bop!(
+const_bop! {
     ConstSub, const_sub,
     "sub $1, $0",
     u8, u16, u32, u64, uint, i8, i16, i32, i64, int
-)
+}
 
-const_bop!(
+const_bop! {
     ConstBitXor, const_bit_xor,
     "xor $1, $0",
     u8, u16, u32, u64, uint, i8, i16, i32, i64, int
-)
+}
 
-const_bop!(
+const_bop! {
     ConstBitAnd, const_bit_and,
     "and $1, $0",
     u8, u16, u32, u64, uint, i8, i16, i32, i64, int
-)
+}
 
-const_bop!(
+const_bop! {
     ConstBitOr, const_bit_or,
     "or $1, $0",
     u8, u16, u32, u64, uint, i8, i16, i32, i64, int
-)
+}
 
-const_bop!(
+const_bop! {
     ConstMul, const_mul,
     "imul $1, $0",
     u16, u32, u64, uint, i16, i32, i64, int
-)
+}
 
 // u8/i8 is exceptional
-macro_rules! const_mul8(
+macro_rules! const_mul8 {
     ($($t:ty)*) => (
         $(
             impl ConstMul for $t {
@@ -139,11 +139,11 @@ macro_rules! const_mul8(
             }
         )*
     )
-)
-const_mul8!(u8 i8)
+}
+const_mul8! {u8 i8}
 
 // shl/shr
-macro_rules! const_shift(
+macro_rules! const_shift {
     (
         $tr:ident,
         $m:ident,
@@ -164,25 +164,25 @@ macro_rules! const_shift(
             }
         )*
     )
-)
+}
 
-const_shift!(
+const_shift! {
     ConstShl, const_shl,
     "shl $1, $0",
     u8, u16, u32, u64, uint, i8, i16, i32, i64, int
-)
-const_shift!(
+}
+const_shift! {
     ConstShr, const_shr,
     "shr $1, $0",
     u8, u16, u32, u64, uint
-)
-const_shift!(
+}
+const_shift! {
     ConstShr, const_shr,
     "sar $1, $0",
     i8, i16, i32, i64, int
-)
+}
 
-macro_rules! const_cmp(
+macro_rules! const_cmp {
     (
         $tr:ident,
         $m:ident,
@@ -202,36 +202,36 @@ macro_rules! const_cmp(
             }
         )*
     )
-)
+}
 
-const_cmp!(
+const_cmp! {
     ConstEq, const_eq,
     "cmp $1, $2; sete $0",
     u8, u16, u32, u64, uint, i8, i16, i32, i64, int
-)
+}
 
-const_cmp!(
+const_cmp! {
     ConstLt, const_lt,
     "cmp $1, $2; setb $0",
     u8, u16, u32, u64, uint, i8, i16, i32, i64, int
-)
-const_cmp!(
+}
+const_cmp! {
     ConstGt, const_gt,
     "cmp $2, $1; setb $0",
     u8, u16, u32, u64, uint, i8, i16, i32, i64, int
-)
-const_cmp!(
+}
+const_cmp! {
     ConstLe, const_le,
     "cmp $1, $2; setbe $0",
     u8, u16, u32, u64, uint, i8, i16, i32, i64, int
-)
-const_cmp!(
+}
+const_cmp! {
     ConstGe, const_ge,
     "cmp $2, $1; setbe $0",
     u8, u16, u32, u64, uint, i8, i16, i32, i64, int
-)
+}
 
-macro_rules! const_uop(
+macro_rules! const_uop {
     (
         $tr:ident,
         $m:ident,
@@ -251,20 +251,20 @@ macro_rules! const_uop(
             }
         )*
     )
-)
+}
 
-const_uop!(
+const_uop! {
     ConstNeg, const_neg,
     "neg $0",
     u8, u16, u32, u64, uint, i8, i16, i32, i64, int
-)
-const_uop!(
+}
+const_uop! {
     ConstNot, const_not,
     "not $0",
     u8, u16, u32, u64, uint, i8, i16, i32, i64, int
-)
+}
 
-macro_rules! const_if(
+macro_rules! const_if {
     ($($t:ty),*) => (
         $(
             impl ConstIf<$t> for bool {
@@ -283,9 +283,9 @@ macro_rules! const_if(
             }
         )*
     )
-)
+}
 
-const_if!(u8, u16, u32, u64, uint, i8, i16, i32, i64, int)
+const_if! {u8, u16, u32, u64, uint, i8, i16, i32, i64, int}
 
 #[cfg(test)]
 mod test {
