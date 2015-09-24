@@ -2,12 +2,12 @@
 
 use syntax::ast;
 use syntax::ast::Item;
-use syntax::codemap::{mod, DUMMY_SP};
+use syntax::codemap::{self, DUMMY_SP, Spanned};
 use syntax::ast::DUMMY_NODE_ID as DID;
 use syntax::ptr::P;
 use syntax::parse::token;
 use syntax::ext::base::ExtCtxt;
-use syntax::visit::{mod, Visitor};
+use syntax::visit::{self, Visitor};
 
 pub struct TransFolder<'a, 'b: 'a> {
     cx: &'a mut ExtCtxt<'b>,
@@ -22,7 +22,7 @@ impl<'a, 'b: 'a> TransFolder<'a, 'b> {
 
     pub fn trans_item(&mut self, item: P<Item>) -> P<Item> {
         let ret_default = match item.node {
-            ast::ItemFn(_, _, _, ref generics, _) => {
+            ast::ItemFn(_, _, _, _, ref generics, _) => {
                 if generics.is_parameterized() {
                     self.cx.span_err(item.span, "generics are not supported");
                     true
@@ -39,7 +39,7 @@ impl<'a, 'b: 'a> TransFolder<'a, 'b> {
 
         item.map(|item| {
             let new_item_node = match item.node {
-                ast::ItemFn(decl, fn_style, abi, generics, body) => {
+                ast::ItemFn(decl, fn_style, constness, abi, generics, body) => {
                     // inject `use nadeko::asm::*;`
                     let body = body.map(|mut body| {
                         let prelude_path = ast::Path {
@@ -56,20 +56,28 @@ impl<'a, 'b: 'a> TransFolder<'a, 'b> {
                                 }
                             ),
                         };
-                        let path = ast::ViewPathGlob(prelude_path, DID);
+                        let path = ast::ViewPathGlob(prelude_path);
                         let path = P(codemap::dummy_spanned(path));
 
-                        body.view_items.push(ast::ViewItem {
-                            node: ast::ViewItemUse(path),
-                            attrs: Vec::new(),
-                            vis: ast::Inherited,
+                        body.stmts.push(P(Spanned {
+                            node: ast::StmtDecl(P(Spanned {
+                                node: ast::DeclItem(P(ast::Item {
+                                    id: DID,
+                                    ident: ast::Ident::new(ast::Name(0)),
+                                    node: ast::ItemUse(path),
+                                    attrs: Vec::new(),
+                                    vis: ast::Inherited,
+                                    span: DUMMY_SP,
+                                })),
+                                span: DUMMY_SP,
+                            }), DID),
                             span: DUMMY_SP,
-                        });
+                        }));
                         body
                     });
 
                     let new_fn_block = self.trans_block(body);
-                    ast::ItemFn(decl, fn_style, abi, generics, new_fn_block)
+                    ast::ItemFn(decl, fn_style, constness, abi, generics, new_fn_block)
                 }
                 ast::ItemMod(mod_) => {
                     let new_mod = ast::Mod {
@@ -175,7 +183,7 @@ impl<'a, 'b: 'a> TransFolder<'a, 'b> {
     fn trans_expr(&mut self, expr: P<ast::Expr>) -> P<ast::Expr> {
         expr.map(|expr| {
             let new_node = match expr.node {
-                ast::ExprPath(p) => ast::ExprPath(p.clone()),
+                ast::ExprPath(p, x) => ast::ExprPath(p.clone(), x),
                 ast::ExprLit(l) => ast::ExprLit(l.clone()),
                 ast::ExprParen(e) => ast::ExprParen(self.trans_expr(e)),
                 ast::ExprCall(path, args) => {
@@ -339,8 +347,8 @@ impl<'a, 'b: 'a> TransFolder<'a, 'b> {
                 // allow `for i in const..const` only.
                 ast::ExprForLoop(for_pat, for_expr, for_blk, id) => {
                     if let ast::ExprRange(ref start, ref end) = for_expr.node {
-                        if !expr_is_lit(&**start) {
-                            self.cx.span_err(start.span, "non-constant range");
+                        if start.iter().next().map(|x| match x.node { ast::ExprLit(_) => false, _ => true }).unwrap_or(false) {
+                            self.cx.span_err(start.iter().next().map( |x| x.span ).unwrap_or( DUMMY_SP ), "non-constant range");
                         }
                         if let Some(ref end) = *end {
                             if !expr_is_lit(&**end) {
@@ -362,7 +370,7 @@ impl<'a, 'b: 'a> TransFolder<'a, 'b> {
                 }
 
                 _ => {
-                    let err = format!("unimplemented: {}", expr.node);
+                    let err = format!("unimplemented: {:?}", expr.node);
                     self.cx.span_err(expr.span, &*err);
                     // dummy
                     ast::ExprTup(Vec::new())
@@ -450,7 +458,7 @@ fn expr_has_side_effect(e: &ast::Expr) -> bool {
 }
 
 fn bop_method_name(bop: ast::BinOp) -> &'static str {
-    match bop {
+    match bop.node {
         ast::BiAdd => "const_add",
         ast::BiSub => "const_sub",
         ast::BiMul => "const_mul",
