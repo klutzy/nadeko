@@ -39,10 +39,10 @@ const_bop_cmp_def! {
 }
 
 pub trait ConstShl {
-    fn const_shl(self, b: uint) -> Self;
+    fn const_shl(self, b: usize) -> Self;
 }
 pub trait ConstShr {
-    fn const_shr(self, b: uint) -> Self;
+    fn const_shr(self, b: usize) -> Self;
 }
 
 macro_rules! const_uop_def {
@@ -75,6 +75,7 @@ macro_rules! const_bop {
         $(
             impl $tr for $t {
                 #[inline(always)]
+                #[allow(unused_mut)]
                 fn $m(self, b: $t) -> $t {
                     let mut ret: $t;
                     unsafe {
@@ -90,37 +91,37 @@ macro_rules! const_bop {
 const_bop! {
     ConstAdd, const_add,
     "add $1, $0",
-    u8, u16, u32, u64, uint, i8, i16, i32, i64, int
+    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize
 }
 
 const_bop! {
     ConstSub, const_sub,
     "sub $1, $0",
-    u8, u16, u32, u64, uint, i8, i16, i32, i64, int
+    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize
 }
 
 const_bop! {
     ConstBitXor, const_bit_xor,
     "xor $1, $0",
-    u8, u16, u32, u64, uint, i8, i16, i32, i64, int
+    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize
 }
 
 const_bop! {
     ConstBitAnd, const_bit_and,
     "and $1, $0",
-    u8, u16, u32, u64, uint, i8, i16, i32, i64, int
+    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize
 }
 
 const_bop! {
     ConstBitOr, const_bit_or,
     "or $1, $0",
-    u8, u16, u32, u64, uint, i8, i16, i32, i64, int
+    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize
 }
 
 const_bop! {
     ConstMul, const_mul,
     "imul $1, $0",
-    u16, u32, u64, uint, i16, i32, i64, int
+    u16, u32, u64, usize, i16, i32, i64, isize
 }
 
 // u8/i8 is exceptional
@@ -129,6 +130,7 @@ macro_rules! const_mul8 {
         $(
             impl ConstMul for $t {
                 #[inline(always)]
+                #[allow(unused_mut)]
                 fn const_mul(self, b: $t) -> $t {
                     let mut ret: $t;
                     unsafe {
@@ -153,7 +155,8 @@ macro_rules! const_shift {
         $(
             impl $tr for $t {
                 #[inline(always)]
-                fn $m(self, b: uint) -> $t {
+                #[allow(unused_mut)]
+                fn $m(self, b: usize) -> $t {
                     let mut ret: $t;
                     unsafe {
                         // FIXME: overlong shift is undefined in Rust (rust-lang/rust#10183)
@@ -169,17 +172,17 @@ macro_rules! const_shift {
 const_shift! {
     ConstShl, const_shl,
     "shl $1, $0",
-    u8, u16, u32, u64, uint, i8, i16, i32, i64, int
+    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize
 }
 const_shift! {
     ConstShr, const_shr,
     "shr $1, $0",
-    u8, u16, u32, u64, uint
+    u8, u16, u32, u64, usize
 }
 const_shift! {
     ConstShr, const_shr,
     "sar $1, $0",
-    i8, i16, i32, i64, int
+    i8, i16, i32, i64, isize
 }
 
 macro_rules! const_cmp {
@@ -192,6 +195,7 @@ macro_rules! const_cmp {
         $(
             impl $tr for $t {
                 #[inline(always)]
+                #[allow(unused_mut)]
                 fn $m(self, b: $t) -> bool {
                     let mut ret: bool;
                     unsafe {
@@ -207,28 +211,28 @@ macro_rules! const_cmp {
 const_cmp! {
     ConstEq, const_eq,
     "cmp $1, $2; sete $0",
-    u8, u16, u32, u64, uint, i8, i16, i32, i64, int
+    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize
 }
 
 const_cmp! {
     ConstLt, const_lt,
     "cmp $1, $2; setb $0",
-    u8, u16, u32, u64, uint, i8, i16, i32, i64, int
+    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize
 }
 const_cmp! {
     ConstGt, const_gt,
     "cmp $2, $1; setb $0",
-    u8, u16, u32, u64, uint, i8, i16, i32, i64, int
+    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize
 }
 const_cmp! {
     ConstLe, const_le,
     "cmp $1, $2; setbe $0",
-    u8, u16, u32, u64, uint, i8, i16, i32, i64, int
+    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize
 }
 const_cmp! {
     ConstGe, const_ge,
     "cmp $2, $1; setbe $0",
-    u8, u16, u32, u64, uint, i8, i16, i32, i64, int
+    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize
 }
 
 macro_rules! const_uop {
@@ -241,6 +245,7 @@ macro_rules! const_uop {
         $(
             impl $tr for $t {
                 #[inline(always)]
+                #[allow(unused_mut)]
                 fn $m(self) -> $t {
                     let mut ret: $t;
                     unsafe {
@@ -256,12 +261,12 @@ macro_rules! const_uop {
 const_uop! {
     ConstNeg, const_neg,
     "neg $0",
-    u8, u16, u32, u64, uint, i8, i16, i32, i64, int
+    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize
 }
 const_uop! {
     ConstNot, const_not,
     "not $0",
-    u8, u16, u32, u64, uint, i8, i16, i32, i64, int
+    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize
 }
 
 macro_rules! const_if {
@@ -285,7 +290,7 @@ macro_rules! const_if {
     )
 }
 
-const_if! {u8, u16, u32, u64, uint, i8, i16, i32, i64, int}
+const_if! {u8, u16, u32, u64, usize, i8, i16, i32, i64, isize}
 
 #[cfg(test)]
 mod test {
