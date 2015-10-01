@@ -298,8 +298,8 @@ mod test {
 
     #[test]
     fn test_const_if() {
-        for a in range(0u8, 255) {
-            for b in range(0u8, 255) {
+        for a in 0u8 .. 255 {
+            for b in 0u8 .. 255 {
                 let must_be_a = true.const_if(a, b);
                 let must_be_b = false.const_if(a, b);
 

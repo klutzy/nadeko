@@ -63,7 +63,7 @@ impl<'a, 'b: 'a> TransFolder<'a, 'b> {
                             node: ast::StmtDecl(P(Spanned {
                                 node: ast::DeclItem(P(ast::Item {
                                     id: DID,
-                                    ident: ast::Ident::new(ast::Name(0)),
+                                    ident: ast::Ident::with_empty_ctxt(ast::Name(0)),
                                     node: ast::ItemUse(path),
                                     attrs: Vec::new(),
                                     vis: ast::Inherited,
@@ -224,10 +224,6 @@ impl<'a, 'b: 'a> TransFolder<'a, 'b> {
                 ast::ExprUnary(uop, a) => {
                     let new_a = self.trans_expr(a);
                     match uop {
-                        ast::UnUniq => {
-                            self.cx.span_err(expr.span, "UnUniq not supported");
-                            ast::ExprUnary(ast::UnUniq, new_a)
-                        }
                         ast::UnDeref => {
                             ast::ExprUnary(ast::UnDeref, new_a)
                         }

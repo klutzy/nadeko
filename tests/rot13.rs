@@ -1,6 +1,6 @@
-#![feature(phase)]
+#![feature(plugin)]
+#![plugin(nadeko)]
 
-#[phase(plugin, link)]
 extern crate nadeko;
 
 // mecha mecha secure crypto
@@ -24,7 +24,7 @@ mod rot13 {
 
 #[test]
 fn test_rot13() {
-    for a in range(b'A', b'Z' + 1) {
+    for a in b'A' .. b'Z' + 1 {
         let expected = if a <= b'M' { a + 13 } else { a - 13 };
         let output = rot13::encrypt(a);
         println!("input: {}", a);

@@ -80,12 +80,12 @@ fn test_ops() {
         assert_eq!(ops::neg8(a), -a);
         assert_eq!(ops::not8(a), !a);
 
-        for b in range(1u, 7) {
+        for b in 1u .. 7 {
             assert_eq!(ops::shr8(a, b), a >> b);
             assert_eq!(ops::sar8(a as i8, b), (a as i8) >> b);
         }
 
-        for b in range(0u8, 255) {
+        for b in 0u8 .. 255 {
             assert_eq!(ops::add8(a, b), a + b);
             assert_eq!(ops::xor8(a, b), a ^ b);
             assert_eq!(ops::mul8(a, b), a * b);
