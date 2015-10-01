@@ -3,6 +3,5 @@ name = "nadeko"
 version = "0.0.1"
 authors = ["klutzy <klutzytheklutzy@gmail.com>"]
 
-[lib]
-name = "nadeko"
-plugin = true
+[dev-dependencies]
+nadeko-plugin = { path = "nadeko-plugin" }

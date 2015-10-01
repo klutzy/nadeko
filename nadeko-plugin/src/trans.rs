@@ -1,20 +1,20 @@
 // translate function items
 
 use syntax::ast;
-use syntax::ast::Item;
-use syntax::codemap::{self, DUMMY_SP, Spanned};
 use syntax::ast::DUMMY_NODE_ID as DID;
-use syntax::ptr::P;
-use syntax::parse::token;
+use syntax::ast::Item;
+use syntax::codemap::DUMMY_SP;
 use syntax::ext::base::ExtCtxt;
+use syntax::ext::build::AstBuilder;
+use syntax::ptr::P;
 use syntax::visit::{self, Visitor};
 
 pub struct TransFolder<'a, 'b: 'a> {
-    cx: &'a mut ExtCtxt<'b>,
+    cx: &'a ExtCtxt<'b>,
 }
 
 impl<'a, 'b: 'a> TransFolder<'a, 'b> {
-    pub fn new(cx: &'a mut ExtCtxt<'b>) -> TransFolder<'a, 'b> {
+    pub fn new(cx: &'a ExtCtxt<'b>) -> TransFolder<'a, 'b> {
         TransFolder {
             cx: cx,
         }
@@ -40,42 +40,6 @@ impl<'a, 'b: 'a> TransFolder<'a, 'b> {
         item.map(|item| {
             let new_item_node = match item.node {
                 ast::ItemFn(decl, fn_style, constness, abi, generics, body) => {
-                    // inject `use nadeko::asm::*;`
-                    let body = body.map(|mut body| {
-                        let prelude_path = ast::Path {
-                            span: DUMMY_SP,
-                            global: false,
-                            segments: vec!(
-                                ast::PathSegment {
-                                    identifier: token::str_to_ident("nadeko"),
-                                    parameters: ast::PathParameters::none(),
-                                },
-                                ast::PathSegment {
-                                    identifier: token::str_to_ident("asm"),
-                                    parameters: ast::PathParameters::none(),
-                                }
-                            ),
-                        };
-                        let path = ast::ViewPathGlob(prelude_path);
-                        let path = P(codemap::dummy_spanned(path));
-
-                        body.stmts.push(P(Spanned {
-                            node: ast::StmtDecl(P(Spanned {
-                                node: ast::DeclItem(P(ast::Item {
-                                    id: DID,
-                                    ident: ast::Ident::with_empty_ctxt(ast::Name(0)),
-                                    node: ast::ItemUse(path),
-                                    attrs: Vec::new(),
-                                    vis: ast::Inherited,
-                                    span: DUMMY_SP,
-                                })),
-                                span: DUMMY_SP,
-                            }), DID),
-                            span: DUMMY_SP,
-                        }));
-                        body
-                    });
-
                     let new_fn_block = self.trans_block(body);
                     ast::ItemFn(decl, fn_style, constness, abi, generics, new_fn_block)
                 }
@@ -211,14 +175,18 @@ impl<'a, 'b: 'a> TransFolder<'a, 'b> {
 
                 // convert `a op b` into `a.const_op(b)`
                 ast::ExprBinary(bop, a, b) => {
-                    let new_a = self.trans_expr(a);
-                    let new_b = self.trans_expr(b);
-                    let method_name = bop_method_name(bop);
-                    let ident = ast::SpannedIdent {
-                        node: token::str_to_ident(method_name),
-                        span: expr.span,
-                    };
-                    ast::ExprMethodCall(ident, Vec::new(), vec!(new_a, new_b))
+                    let (trait_name, method_name) = bop_method_name(bop);
+                    self.cx.expr_call_global(
+                        expr.span,
+                        vec![
+                            self.cx.ident_of("nadeko"),
+                            self.cx.ident_of(trait_name),
+                            self.cx.ident_of(method_name),
+                        ],
+                        vec![
+                            self.trans_expr(a),
+                            self.trans_expr(b),
+                        ]).node.clone()
                 }
 
                 ast::ExprUnary(uop, a) => {
@@ -228,16 +196,20 @@ impl<'a, 'b: 'a> TransFolder<'a, 'b> {
                             ast::ExprUnary(ast::UnDeref, new_a)
                         }
                         ast::UnNot | ast::UnNeg => {
-                            let method_name = match uop {
-                                ast::UnNot => "const_not",
-                                ast::UnNeg => "const_neg",
+                            let (trait_name, method_name) = match uop {
+                                ast::UnNot => ("ConstNot", "const_not"),
+                                ast::UnNeg => ("ConstNeg", "const_neg"),
                                 _ => unreachable!(),
                             };
-                            let ident = ast::SpannedIdent {
-                                node: token::str_to_ident(method_name),
-                                span: expr.span,
-                            };
-                            ast::ExprMethodCall(ident, Vec::new(), vec!(new_a))
+                            self.cx.expr_call_global(
+                                expr.span,
+                                vec![
+                                    self.cx.ident_of("nadeko"),
+                                    self.cx.ident_of(trait_name),
+                                    self.cx.ident_of(method_name),
+                                ],
+                                vec![new_a]
+                            ).node.clone()
                         }
                     }
                 }
@@ -252,6 +224,32 @@ impl<'a, 'b: 'a> TransFolder<'a, 'b> {
                 }
 
                 ast::ExprAssignOp(bop, lhs, rhs) => {
+                    let (trait_name, method_name) = bop_method_name(bop);
+
+                    // `a += b` => `a = a + b`
+                    if !expr_is_assignable(&*lhs) {
+                        self.cx.span_err(lhs.span, "non-assignable lhs");
+                    }
+
+                    let new_lhs = self.trans_expr(lhs);
+                    let new_rhs = self.trans_expr(rhs);
+                    let new_lhs_2 = new_lhs.clone();
+
+                    let assign = self.cx.expr_call_global(
+                        expr.span,
+                        vec![
+                            self.cx.ident_of("nadeko"),
+                            self.cx.ident_of(trait_name),
+                            self.cx.ident_of(method_name),
+                        ],
+                        vec![
+                            new_lhs_2,
+                            new_rhs,
+                        ]);
+
+                    ast::ExprAssign(new_lhs, assign)
+
+                    /*
                     // `a += b` => `a = a + b`
                     if !expr_is_assignable(&*lhs) {
                         self.cx.span_err(lhs.span, "non-assignable lhs");
@@ -273,6 +271,7 @@ impl<'a, 'b: 'a> TransFolder<'a, 'b> {
                     });
 
                     ast::ExprAssign(new_lhs, assign)
+                     */
                 }
 
                 ast::ExprVec(exprs) => {
@@ -332,12 +331,15 @@ impl<'a, 'b: 'a> TransFolder<'a, 'b> {
                         }
                     };
 
-                    let ident = ast::SpannedIdent {
-                        node: token::str_to_ident("const_if"),
-                        span: expr.span,
-                    };
-                    let args = vec!(new_cond, new_if_expr, new_else_expr);
-                    ast::ExprMethodCall(ident, Vec::new(), args)
+                    self.cx.expr_call_global(
+                        expr.span,
+                        vec![
+                            self.cx.ident_of("nadeko"),
+                            self.cx.ident_of("ConstIf"),
+                            self.cx.ident_of("const_if"),
+                        ],
+                        vec![new_cond, new_if_expr, new_else_expr]
+                    ).node.clone()
                 }
 
                 // allow `for i in const..const` only.
@@ -363,6 +365,47 @@ impl<'a, 'b: 'a> TransFolder<'a, 'b> {
                 ast::ExprMac(..) => {
                     self.cx.span_err(expr.span, "macros cannot not be here");
                     ast::ExprTup(Vec::new())
+                }
+
+                ast::ExprMatch(discriminant, arms, match_source) => {
+                    let discriminant = self.trans_expr(discriminant);
+                    let arms = arms.into_iter()
+                        .map(|arm| {
+                            ast::Arm {
+                                attrs: arm.attrs,
+                                pats: arm.pats,
+                                guard: arm.guard.map(|guard| self.trans_expr(guard)),
+                                body: self.trans_expr(arm.body),
+                            }
+                        })
+                        .collect();
+
+                    ast::ExprMatch(discriminant, arms, match_source)
+                }
+
+                ast::ExprRange(min, max) => {
+                    ast::ExprRange(
+                        min.map(|min| self.trans_expr(min)),
+                        max.map(|max| self.trans_expr(max))
+                    )
+                }
+
+                ast::ExprLoop(block, ident) => {
+                    ast::ExprLoop(
+                        self.trans_block(block),
+                        ident
+                    )
+                }
+
+                ast::ExprAddrOf(mutability, expr) => {
+                    ast::ExprAddrOf(
+                        mutability,
+                        self.trans_expr(expr),
+                    )
+                }
+
+                ast::ExprBreak(ident) => {
+                    ast::ExprBreak(ident)
                 }
 
                 _ => {
@@ -453,25 +496,25 @@ fn expr_has_side_effect(e: &ast::Expr) -> bool {
     checker.into_inner()
 }
 
-fn bop_method_name(bop: ast::BinOp) -> &'static str {
+fn bop_method_name(bop: ast::BinOp) -> (&'static str, &'static str) {
     match bop.node {
-        ast::BiAdd => "const_add",
-        ast::BiSub => "const_sub",
-        ast::BiMul => "const_mul",
-        ast::BiDiv => "const_div",
-        ast::BiRem => "const_rem",
-        ast::BiAnd => "const_and",
-        ast::BiOr => "const_or",
-        ast::BiBitXor => "const_bit_xor",
-        ast::BiBitAnd => "const_bit_and",
-        ast::BiBitOr => "const_bit_or",
-        ast::BiShl => "const_shl",
-        ast::BiShr => "const_shr",
-        ast::BiEq => "const_eq",
-        ast::BiLt => "const_lt",
-        ast::BiLe => "const_le",
-        ast::BiNe => "const_ne",
-        ast::BiGe => "const_ge",
-        ast::BiGt => "const_gt",
+        ast::BiAdd => ("ConstAdd", "const_add"),
+        ast::BiSub => ("ConstSub", "const_sub"),
+        ast::BiMul => ("ConstMul", "const_mul"),
+        ast::BiDiv => ("ConstDiv", "const_div"),
+        ast::BiRem => ("ConstRem", "const_rem"),
+        ast::BiAnd => ("ConstAnd", "const_and"),
+        ast::BiOr => ("ConstOr", "const_or"),
+        ast::BiBitXor => ("ConstBitXor", "const_bit_xor"),
+        ast::BiBitAnd => ("ConstBitAnd", "const_bit_and"),
+        ast::BiBitOr => ("ConstBitOr", "const_bit_or"),
+        ast::BiShl => ("ConstShl", "const_shl"),
+        ast::BiShr => ("ConstShr", "const_shr"),
+        ast::BiEq => ("ConstEq", "const_eq"),
+        ast::BiLt => ("ConstLt", "const_lt"),
+        ast::BiLe => ("ConstLe", "const_le"),
+        ast::BiNe => ("ConstNe", "const_ne"),
+        ast::BiGe => ("ConstGe", "const_ge"),
+        ast::BiGt => ("ConstGt", "const_gt"),
     }
 }
