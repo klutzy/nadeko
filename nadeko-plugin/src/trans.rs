@@ -367,47 +367,6 @@ impl<'a, 'b: 'a> TransFolder<'a, 'b> {
                     ast::ExprTup(Vec::new())
                 }
 
-                ast::ExprMatch(discriminant, arms, match_source) => {
-                    let discriminant = self.trans_expr(discriminant);
-                    let arms = arms.into_iter()
-                        .map(|arm| {
-                            ast::Arm {
-                                attrs: arm.attrs,
-                                pats: arm.pats,
-                                guard: arm.guard.map(|guard| self.trans_expr(guard)),
-                                body: self.trans_expr(arm.body),
-                            }
-                        })
-                        .collect();
-
-                    ast::ExprMatch(discriminant, arms, match_source)
-                }
-
-                ast::ExprRange(min, max) => {
-                    ast::ExprRange(
-                        min.map(|min| self.trans_expr(min)),
-                        max.map(|max| self.trans_expr(max))
-                    )
-                }
-
-                ast::ExprLoop(block, ident) => {
-                    ast::ExprLoop(
-                        self.trans_block(block),
-                        ident
-                    )
-                }
-
-                ast::ExprAddrOf(mutability, expr) => {
-                    ast::ExprAddrOf(
-                        mutability,
-                        self.trans_expr(expr),
-                    )
-                }
-
-                ast::ExprBreak(ident) => {
-                    ast::ExprBreak(ident)
-                }
-
                 _ => {
                     let err = format!("unimplemented: {:?}", expr.node);
                     self.cx.span_err(expr.span, &*err);
