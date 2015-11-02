@@ -1,0 +1,8 @@
+[package]
+name = "nadeko-plugin"
+version = "0.1.0"
+authors = ["Erick Tryzelaar <erick.tryzelaar@gmail.com>"]
+
+[lib]
+name = "nadeko_plugin"
+plugin = true

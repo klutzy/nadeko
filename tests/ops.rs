@@ -1,6 +1,6 @@
-#![feature(phase)]
+#![feature(plugin)]
+#![plugin(nadeko_plugin)]
 
-#[phase(plugin, link)]
 extern crate nadeko;
 
 #[const_time]
@@ -30,7 +30,6 @@ mod ops {
         return a * b;
     }
 
-    #[allow(unsigned_negation)]
     pub fn neg8(a: u8) -> u8 {
         return -a;
     }
@@ -64,31 +63,30 @@ mod ops {
         }
     }
 
-    pub fn shr8(a: u8, b: uint) -> u8 {
+    pub fn shr8(a: u8, b: usize) -> u8 {
         a >> b
     }
 
-    pub fn sar8(a: i8, b: uint) -> i8 {
+    pub fn sar8(a: i8, b: usize) -> i8 {
         a >> b
     }
 }
 
-#[allow(unsigned_negation)]
 #[test]
 fn test_ops() {
-    for a in range(0u8, 255) {
-        assert_eq!(ops::neg8(a), -a);
+    for a in 0u8 .. 128 {
+        assert_eq!(ops::neg8(a), a.wrapping_neg());
         assert_eq!(ops::not8(a), !a);
 
-        for b in range(1u, 7) {
+        for b in 1usize .. 7 {
             assert_eq!(ops::shr8(a, b), a >> b);
             assert_eq!(ops::sar8(a as i8, b), (a as i8) >> b);
         }
 
-        for b in range(0u8, 255) {
-            assert_eq!(ops::add8(a, b), a + b);
+        for b in 0u8 .. 255 {
+            assert_eq!(ops::add8(a, b), a.wrapping_add(b));
             assert_eq!(ops::xor8(a, b), a ^ b);
-            assert_eq!(ops::mul8(a, b), a * b);
+            assert_eq!(ops::mul8(a, b), a.wrapping_mul(b));
 
             assert_eq!(ops::gt8(a, b), a > b);
             assert_eq!(ops::lt8(a, b), a < b);
@@ -102,9 +100,9 @@ fn test_ops() {
             let a16 = (a16 << 8) | a16;
             let b16 = b as u16;
             let b16 = (b16 << 8) | b16;
-            assert_eq!(ops::add16(a16, b16), a16 + b16);
+            assert_eq!(ops::add16(a16, b16), a16.wrapping_add(b16));
             assert_eq!(ops::xor16(a16, b16), a16 ^ b16);
-            assert_eq!(ops::mul16(a16, b16), a16 * b16);
+            assert_eq!(ops::mul16(a16, b16), a16.wrapping_mul(b16));
         }
     }
 }
